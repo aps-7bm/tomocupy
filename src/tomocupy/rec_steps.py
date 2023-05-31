@@ -39,8 +39,9 @@
 # *************************************************************************** #
 
 from tomocupy import utils
-from tomocupy import logging
+from tomocupy import log_local as logging
 from tomocupy import conf_sizes
+from tomocupy import conf_filepars
 from tomocupy import tomo_functions
 from threading import Thread
 from tomocupy import reader
@@ -78,6 +79,7 @@ class GPURecSteps():
         # configure sizes and output files
         cl_reader = reader.Reader(args)
         cl_conf = conf_sizes.ConfSizes(args, cl_reader)
+        cl_filepars = conf_filepars.ConfFilepars(args, cl_reader)
         cl_writer = writer.Writer(args, cl_conf)
 
         # chunks for processing
@@ -94,7 +96,7 @@ class GPURecSteps():
         self.shape_data_fulln = (cl_conf.nproj, cl_conf.nz, cl_conf.n)
 
         # init tomo functions
-        self.cl_tomo_func = tomo_functions.TomoFunctions(cl_conf)
+        self.cl_tomo_func = tomo_functions.TomoFunctions(cl_conf, cl_filepars)
 
         # streams for overlapping data transfers with computations
         self.stream1 = cp.cuda.Stream(non_blocking=False)
@@ -105,7 +107,7 @@ class GPURecSteps():
         self.write_threads = []
         for k in range(cl_conf.args.max_write_threads):
             self.write_threads.append(utils.WRThread())
-
+        
         # additional refs
         self.dtype = cl_conf.dtype
         self.in_dtype = cl_conf.in_dtype
@@ -120,11 +122,12 @@ class GPURecSteps():
         log.info('Step 1. Reading data.')
         data, flat, dark = self.read_data_parallel()        
 
-        log.info('Step 2. Processing by chunks in z.')
-        data = self.proc_sino_parallel(data, dark, flat)
+        if self.args.pre_processing == 'True':
+            log.info('Step 2. Processing by chunks in z.')
+            data = self.proc_sino_parallel(data, dark, flat)
 
-        log.info('Step 3. Processing by chunks in angles.')
-        data = self.proc_proj_parallel(data)
+            log.info('Step 3. Processing by chunks in angles.')
+            data = self.proc_proj_parallel(data)
         
         if self.cl_conf.args.reconstruction_type == 'full':
             if self.cl_conf.args.lamino_angle == 0:
@@ -159,7 +162,9 @@ class GPURecSteps():
         procs = []
         for k in range(nthreads):
             st_proj = k*lchunk
-            end_proj = (k+1)*lchunk
+            end_proj = min((k+1)*lchunk,self.args.end_proj-self.args.start_proj)
+            if st_proj>=end_proj:
+                continue
             read_thread = Thread(
                 target=self.cl_reader.read_proj_chunk, args=(data, st_proj, end_proj, self.args.start_row, self.args.end_row, st_n, end_n))
             procs.append(read_thread)
@@ -265,7 +270,7 @@ class GPURecSteps():
             if(k > 0 and k < ntchunk+1):
                 with self.stream2:  # reconstruction
                     self.cl_tomo_func.proc_proj(
-                        data_gpu[(k-1) % 2], rec_gpu[(k-1) % 2])
+                        data_gpu[(k-1) % 2], 0, self.shape_data_chunk_t[1], rec_gpu[(k-1) % 2])
             if(k > 1):
                 with self.stream3:  # gpu->cpu copy
                     rec_gpu[(k-2) % 2].get(out=rec_pinned[(k-2) % 2])
@@ -387,7 +392,7 @@ class GPURecSteps():
                         data0 = self.cl_tomo_func.fbp_filter_center(
                             data0, cp.tile(np.float32(0), [data0.shape[0], 1]))
                         self.cl_tomo_func.cl_rec.backprojection(
-                            rec, data0, self.stream2, theta0, self.cl_conf.lamino_angle, (kr-1)*ncz)
+                            rec, data0, self.stream2, theta0, self.cl_conf.lamino_angle, (kr-1)*ncz+self.args.lamino_start_row//2**self.args.binning)
 
                 if (kr > 1 and kt == 0):
                     with self.stream3:  # gpu->cpu copy
@@ -409,7 +414,7 @@ class GPURecSteps():
                 self.stream3.synchronize()
                 if (kr > 1 and kt == 0):
                     # add a new thread for writing to hard disk (after gpu->cpu copy is done)
-                    st = (kr-2)*ncz+self.args.start_row//2**self.args.binning
+                    st = (kr-2)*ncz+self.args.lamino_start_row//2**self.args.binning
                     end = st+lrchunk[kr-2]
                     self.write_threads[ithread].run(
                         self.cl_writer.write_data_chunk, (rec_pinned[ithread], st, end, kr-2))
@@ -612,3 +617,4 @@ class GPURecSteps():
 
             for t in self.write_threads:
                 t.join()
+                

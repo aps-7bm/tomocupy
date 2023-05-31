@@ -44,13 +44,14 @@ from pathlib import Path
 import argparse
 import configparser
 from collections import OrderedDict
-import logging
+# import logging
 import warnings
 import inspect
 
 import h5py
 import numpy as np
 
+from tomocupy import log_local as logging
 from tomocupy import utils
 from tomocupy import __version__
 
@@ -128,6 +129,16 @@ SECTIONS['file-reading'] = {
         'type': Path,
         'help': "Name of the last used hdf file or directory containing multiple hdf files",
         'metavar': 'PATH'},
+    'flat-file-name': {
+        'default': None,
+        'type': Path,
+        'help': "Name of the hdf file containing flat data",
+        'metavar': 'PATH'},
+    'dark-file-name': {
+        'default': None,
+        'type': Path,
+        'help': "Name of the hdf file containing dark data",
+        'metavar': 'PATH'},
     'out-path-name': {
         'default': None,
         'type': Path,
@@ -155,7 +166,7 @@ SECTIONS['remove-stripe'] = {
         'default': 'none',
         'type': str,
         'help': "Remove stripe method: none, fourier-wavelet, titarenko",
-        'choices': ['none', 'fw', 'ti']},
+        'choices': ['none', 'fw', 'ti', 'vo-all']},
 }
 
 
@@ -180,11 +191,34 @@ SECTIONS['fw'] = {
 }
 
 
+SECTIONS['vo-all'] = {
+    'vo-all-snr': {
+        'default': 3,
+        'type': float,
+        'help': "Ratio used to locate large stripes. Greater is less sensitive."},
+    'vo-all-la-size': {
+        'default': 61,
+        'type': utils.positive_int,
+        'help': "Window size of the median filter to remove large stripes."},
+    'vo-all-sm-size': {
+        'type': utils.positive_int,
+        'default': 21,
+        'help': "Window size of the median filter to remove small-to-medium stripes."},
+    'vo-all-dim': {
+        'default': 1,
+        'help': "Dimension of the window."},
+}
+
+
 SECTIONS['ti'] = {
     'ti-beta': {
         'default': 0.022,  # as in the paper
         'type': float,
         'help': "Parameter for ring removal (0,1)"},
+    'ti-mask': {
+        'default': 1,
+        'type': float,
+        'help': "Mask size for ring removal (0,1)"},
 }
 
 SECTIONS['retrieve-phase'] = {
@@ -194,24 +228,24 @@ SECTIONS['retrieve-phase'] = {
         'help': "Phase retrieval correction method",
         'choices': ['none', 'paganin']},
     'energy': {
-        'default': 20,
+        'default': 0,
         'type': float,
         'help': "X-ray energy [keV]"},
     'propagation-distance': {
-        'default': 60,
+        'default': 0,
         'type': float,
         'help': "Sample detector distance [mm]"},
     'pixel-size': {
-        'default': 1.17,
+        'default': 0,
         'type': float,
         'help': "Pixel size [microns]"},
     'retrieve-phase-alpha': {
-        'default': 0.001,
+        'default': 0,
         'type': float,
         'help': "Regularization parameter"},
     'retrieve-phase-pad': {
         'type': utils.positive_int,
-        'default': 8,
+        'default': 1,
         'help': "Padding with extra slices in z for phase-retrieval filtering"},
 }
 
@@ -239,6 +273,14 @@ SECTIONS['lamino'] = {
         'default': 0,
         'type': float,
         'help': "Pitch of the stage for laminography"},
+    'lamino-start-row': {
+        'default': 0,
+        'type': int,
+        'help': "Start slice for lamino reconstruction"},
+    'lamino-end-row': {
+        'default': -1,
+        'type': int,
+        'help': "End slice for lamino reconstruction"},
 }
 
 SECTIONS['reconstruction-types'] = {
@@ -265,6 +307,96 @@ SECTIONS['reconstruction-steps-types'] = {
         'type': str,
         'help': "Reconstruction algorithm",
         'choices': ['fourierrec', 'linerec']},
+    'pre-processing': {
+        'default': 'True',
+        'type': str,
+        'help': "Preprocess projections or not",
+        'choices': ['True', 'False']},
+}
+
+SECTIONS['beam-hardening'] = {
+    'beam-hardening-method': {
+        'default': 'none',
+        'type': str,
+        'help': "Beam hardening method.",
+        'choices': ['none', 'standard']},
+    'source-distance': {
+        'default': 36.0,
+        'type': float,
+        'help': 'Distance from source to scintillator in m'},
+    'scintillator-read': {
+        'default': False,
+        'help': "When set, read scintillator properties from the HDF file",
+        'action': 'store_true'},
+    'pixel-size-read': {
+        'default': False,
+        'help': "When set, read effective pixel size from the HDF file",
+        'action': 'store_true'},
+    'scintillator-material': {
+        'default': 'LuAG_Ce',
+        'type': str,
+        'help': 'Scintillator material for beam hardening'},
+    'scintillator-thickness': {
+        'default': 100.0,
+        'type': float,
+        'help': 'Scintillator thickness in microns'},
+    'scintillator-density': {
+        'default': 6.0,
+        'type': float,
+        'help': 'Density of scintillator in g/cm^3'},
+    'sample-material': {
+        'default': 'Fe',
+        'type': str,
+        'help': 'Sample material for beam hardening'},
+    'sample-density': {
+        'default': 1.0,
+        'type': float,
+        'help': 'Density of sample material in g/cm^3'},
+    'filter-1-auto': {
+        'default': False,
+        'help': 'If True, read filter 1 from HDF meta data'},
+    'filter-1-material': {
+        'default': 'none',
+        'type': str,
+        'help': 'Filter 1 material for beam hardening'},
+    'filter-1-thickness': {
+        'default': 0.0,
+        'type': float,
+        'help': 'Filter 1 thickness in microns'},
+    'filter-1-density': {
+        'default': 1.0,
+        'type': float,
+        'help': 'Filter 1 density in g/cm^3'},
+    'filter-2-auto': {
+        'default': False,
+        'help': 'If True, read filter 2 from HDF meta data'},
+    'filter-2-material': {
+        'default': 'none',
+        'type': str,
+        'help': 'Filter 2 material for beam hardening'},
+    'filter-2-thickness': {
+        'default': 0.0,
+        'type': float,
+        'help': 'Filter 2 thickness in microns'},
+    'filter-2-density': {
+        'default': 1.0,
+        'type': float,
+        'help': 'Filter 2 density in g/cm^3'},
+    'filter-3-auto': {
+        'default': False,
+        'help': 'If True, read filter 3 from HDF meta data'},
+    'filter-3-material': {
+        'default': 'none',
+        'type': str,
+        'help': 'Filter 3 material in microns'},
+    'filter-3-thickness': {
+        'default': 0.0,
+        'type': float,
+        'help': 'Filter 3 thickness for beam hardening'},
+    'filter-3-density': {
+        'default': 1.0,
+        'type': float,
+        'help': 'Filter 3 density in g/cm^3'},
 }
 
 SECTIONS['reconstruction'] = {
@@ -274,7 +406,7 @@ SECTIONS['reconstruction'] = {
         'help': "Location of rotation axis"},
     'center-search-width': {
         'type': float,
-        'default': 10.0,
+        'default': 50.0,
         'help': "+/- center search width (pixel). "},
     'center-search-step': {
         'type': float,
@@ -333,6 +465,19 @@ SECTIONS['reconstruction'] = {
         'default': '0.5',
         'type': float,
         'help': "SIFT threshold for rotation search.", },
+    'rotation-axis-method': {
+        'default': 'sift',
+        'type': str,
+        'help': "Method for automatic rotation search.",
+        'choices': ['sift', 'vo']},
+    'find-center-start-row': {
+        'type': int,
+        'default': 0,
+        'help': "Start row to find the rotation center"},
+    'find-center-end-row': {
+        'type': int,
+        'default': -1,
+        'help': "End row to find the rotation center"},
     'dtype': {
         'default': 'float32',
         'type': str,
@@ -342,7 +487,7 @@ SECTIONS['reconstruction'] = {
         'default': 'tiff',
         'type': str,
         'help': "Output format",
-        'choices': ['tiff', 'h5']},
+        'choices': ['tiff', 'h5', 'h5sino', 'h5nolinks']},
     'clear-folder': {
         'default': 'False',
         'type': str,
@@ -352,7 +497,7 @@ SECTIONS['reconstruction'] = {
         'default': 'parzen',
         'type': str,
         'help': "Filter for FBP reconstruction",
-        'choices': ['shepp', 'parzen']},
+        'choices': ['ramp', 'shepp', 'hann', 'hamming', 'parzen', 'cosine', 'cosine2']},
     'dezinger': {
         'type': int,
         'default': 0,
@@ -371,17 +516,27 @@ SECTIONS['reconstruction'] = {
         'help': "Max number of threads for reading by chunks"},
     'minus-log': {
         'default': 'True',
-        'help': "take -log or not"},    
+        'help': "Take -log or not"},
+    'flat-linear': {
+        'default': 'False',
+        'help': "Interpolate flat fields for each projections, assumes the number of flat fields at the beginning of the scan is as the same as a the end."},
+    'pad-endpoint': {
+        'default': 'False',
+        'help': "Include or not endpoint for smooting in double fov reconstruction (preventing circle in the middle)."},
+    'bright_exp_ratio': {
+        'default': '1',
+        'type': float,
+        'help': "Bright aspect ration between exposure for flat fields and projections."},
 }
 
 
 RECON_PARAMS = ('file-reading', 'remove-stripe',
-                'reconstruction', 'fw', 'ti', 'reconstruction-types')
-RECON_STEPS_PARAMS = ('file-reading', 'remove-stripe', 'reconstruction', 
-                      'retrieve-phase', 'fw', 'ti', 'lamino', 'reconstruction-steps-types', 'rotate-proj')
+                'reconstruction', 'fw', 'ti', 'vo-all', 'reconstruction-types', 'beam-hardening')
+RECON_STEPS_PARAMS = ('file-reading', 'remove-stripe', 'reconstruction',
+                      'retrieve-phase', 'fw', 'ti', 'vo-all', 'lamino', 'reconstruction-steps-types', 'rotate-proj', 'beam-hardening')
 
 NICE_NAMES = ('General', 'File reading', 'Remove stripe',
-              'Remove stripe FW', 'Remove stripe Titarenko', 'Retrieve phase', 'Reconstruction')
+              'Remove stripe FW', 'Remove stripe Titarenko', 'Remove stripe Vo' 'Retrieve phase', 'Reconstruction')
 
 
 def get_config_name():
@@ -558,8 +713,8 @@ def update_hdf_process(fname, args=None, sections=None):
         with h5py.File(fname, 'r+') as hdf_file:
             # If the group we will write to already exists, remove it
             if hdf_file.get('/process/tomocupy-' + __version__):
-                del(hdf_file['/process/tomocupy-' + __version__])
-            #dt = h5py.string_dtype(encoding='ascii')
+                del (hdf_file['/process/tomocupy-' + __version__])
+            # dt = h5py.string_dtype(encoding='ascii')
             log.info("  *** tomopy.conf parameter written to /process%s in file %s " %
                      (__version__, fname))
             config = configparser.ConfigParser()
