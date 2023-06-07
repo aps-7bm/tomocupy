@@ -1,0 +1,16 @@
+name: tomocupy9
+
+channels:
+  - conda-forge
+
+dependencies:
+  - cupy 
+  - scikit-build 
+  - swig 
+  - pywavelets 
+  - numexpr 
+  - opencv 
+  - tifffile 
+  - h5py 
+  - python=3.9
+  - xraydb
