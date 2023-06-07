@@ -47,9 +47,7 @@ import h5py
 import numpy as np
 import cupy as cp
 import numexpr as ne
-from tomocupy import log_local as logging
-
-log = logging.getLogger(__name__)
+import sys
 
 # Print iterations progress
 
@@ -108,7 +106,7 @@ def signal_handler(sig, frame):
     """Calls abort_scan when ^C or ^Z is typed"""
 
     print('Abort')
-    os.system('kill -9 $PPID')
+    sys.exit(1)
 
 
 class WRThread():
