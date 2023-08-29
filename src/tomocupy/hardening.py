@@ -55,7 +55,8 @@ class Beam_Corrector():
         #Read in the flat and dark
         flat, dark = cl_reader.read_flat_dark(0,-1)
         median_flat = np.median(flat, axis=0) - np.median(dark, axis=0)
-        self.beam_corr= bh.BeamCorrector()
+        self.beam_corr = initiate_BC(params)
+        #self.beam_corr= bh.BeamCorrector()
         self.beam_corr.add_scintillator(
                             params.scintillator_material,
                             params.scintillator_thickness,
@@ -93,7 +94,25 @@ class Beam_Corrector():
         self.interp_trans = cp.array(self.beam_corr.centerline_interp_values[0])
         self.interp_pathlength = cp.array(self.beam_corr.centerline_interp_values[1])
         self.params = params
+
     
+    def initiate_BC(self, params):
+        '''Checks to see if the source should be calculated or (default) read from file.
+        '''
+        if params.calculate_source != 'standard':
+            self.beam_corr = bh.BeamCorrector()
+        else:
+            self.beam_corr = bh.BeamCorrector(
+                                            'calculate_source' = params.calculate_source,
+                                            'E_storage_ring' = params.E_storage_ring,
+                                            'B_storage_ring' = params.B_storage_ring,
+                                            'minimum_E' = params.minimum_E,
+                                            'maximum_E' = params.maximum_E,
+                                            'step_E' = params.step_E,
+                                            'maximum_psi_urad' = params.maximum_psi_urad,
+                                            )
+
+        
     def parse_meta(self, params):
         params = self.read_pixel_size(params)
         params = self.read_filter_materials(params)

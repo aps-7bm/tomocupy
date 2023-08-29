@@ -388,17 +388,46 @@ SECTIONS['beam-hardening'] = {
     'filter-3-material': {
         'default': 'none',
         'type': str,
-        'help': 'Filter 3 material in microns'},
+        'help': 'Filter 3 material for beam hardening'},
     'filter-3-thickness': {
         'default': 0.0,
         'type': float,
-        'help': 'Filter 3 thickness for beam hardening'},
+        'help': 'Filter 3 thickness in microns'},
     'filter-3-density': {
         'default': 1.0,
         'type': float,
         'help': 'Filter 3 density in g/cm^3'},
+    'calculate-source': {
+        'default': 'none',
+        'type': str,
+        'help': "Read source data from file ('none') or calculate ('standard')"},
+    'E_storage_ring': {
+        'default': 7.0,
+        'type': float,
+        'help': 'Storage ring energy in GeV'},
+    'B-storage-ring':  {
+        'default': 0.6,
+        'type': float,
+        'help': 'BM magnetic field in T'},
+    'minimum-E': {
+        'default': 1000,
+        'type': float,
+        'help': 'Minimum energy for spectral calculations in eV'},
+    'maximum-E': {
+        'default': 2e5,
+        'type': float,
+        'help': 'Maximum energy for spectral calculations in eV'),
+    'step-E': {
+        'default': 100,
+        'type': float,
+        'help': 'Energy step for spectral calculations in eV'),
+    'maximum-psi-urad': {
+        'default': 40.0,
+        'type': float,
+        'help': 'Maximum vertical angle from centerline to calculate in microradians'},
 }
 
+ 
 SECTIONS['reconstruction'] = {
     'rotation-axis': {
         'default': -1.0,
