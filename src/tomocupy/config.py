@@ -401,26 +401,26 @@ SECTIONS['beam-hardening'] = {
         'default': 'none',
         'type': str,
         'help': "Read source data from file ('none') or calculate ('standard')"},
-    'E_storage_ring': {
+    'e_storage_ring': {
         'default': 7.0,
         'type': float,
         'help': 'Storage ring energy in GeV'},
-    'B-storage-ring':  {
+    'b-storage-ring':  {
         'default': 0.6,
         'type': float,
         'help': 'BM magnetic field in T'},
-    'minimum-E': {
+    'minimum-e': {
         'default': 1000,
         'type': float,
         'help': 'Minimum energy for spectral calculations in eV'},
-    'maximum-E': {
+    'maximum-e': {
         'default': 2e5,
         'type': float,
-        'help': 'Maximum energy for spectral calculations in eV'),
-    'step-E': {
+        'help': 'Maximum energy for spectral calculations in eV'},
+    'step-e': {
         'default': 100,
         'type': float,
-        'help': 'Energy step for spectral calculations in eV'),
+        'help': 'Energy step for spectral calculations in eV'},
     'maximum-psi-urad': {
         'default': 40.0,
         'type': float,

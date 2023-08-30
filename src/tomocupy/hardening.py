@@ -55,7 +55,7 @@ class Beam_Corrector():
         #Read in the flat and dark
         flat, dark = cl_reader.read_flat_dark(0,-1)
         median_flat = np.median(flat, axis=0) - np.median(dark, axis=0)
-        self.beam_corr = initiate_BC(params)
+        self.initiate_BC(params)
         #self.beam_corr= bh.BeamCorrector()
         self.beam_corr.add_scintillator(
                             params.scintillator_material,
@@ -103,13 +103,13 @@ class Beam_Corrector():
             self.beam_corr = bh.BeamCorrector()
         else:
             self.beam_corr = bh.BeamCorrector(
-                                            'calculate_source' = params.calculate_source,
-                                            'E_storage_ring' = params.E_storage_ring,
-                                            'B_storage_ring' = params.B_storage_ring,
-                                            'minimum_E' = params.minimum_E,
-                                            'maximum_E' = params.maximum_E,
-                                            'step_E' = params.step_E,
-                                            'maximum_psi_urad' = params.maximum_psi_urad,
+                                            calculate_source = params.calculate_source,
+                                            E_storage_ring = params.e_storage_ring,
+                                            B_storage_ring = params.b_storage_ring,
+                                            minimum_E = params.minimum_e,
+                                            maximum_E = params.maximum_e,
+                                            step_E = params.step_e,
+                                            maximum_psi_urad = params.maximum_psi_urad,
                                             )
 
         

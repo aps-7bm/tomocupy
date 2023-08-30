@@ -59,7 +59,7 @@ class ConfFilepars():
         self.bh_obj = None
         if self.args.beam_hardening_method != "none":
             from tomocupy import hardening
-            self.bh_obj = hardening.Beam_Corrector(self.args, self.cl_reader)
+            self.bh_obj = hardening.Beam_Corrector(self.args, self.reader)
     
     def conf_bright_exp_ratio(self):            
         """Find the exposure ratio """
