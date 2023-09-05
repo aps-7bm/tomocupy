@@ -5,6 +5,7 @@ import tifffile
 import inspect
 import h5py
 import shutil
+from pathlib import Path
 
 prefix = 'tomocupy recon --file-name data/test_data.h5 --reconstruction-type full --rotation-axis 782.5 --nsino-per-chunk 4'
 cmd_dict = {
@@ -50,18 +51,16 @@ class Tests(unittest.TestCase):
             st = os.system(cmd[0])
             self.assertEqual(st, 0)
             ssum = 0
-            try:
+            hdf_recon_path = Path.cwd().joinpath('data_rec', 'test_data_rec.h5')
+            if hdf_recon_path.is_file():
                 with h5py.File('data_rec/test_data_rec.h5', 'r') as fid:
                     data = fid['exchange/data']
                     ssum = np.sum(np.linalg.norm(data[:], axis=(1, 2)))
-            except:
-                pass
-            for k in range(24):
-                try:
-                    ssum += np.linalg.norm(tifffile.imread(
-                        f'data_rec/test_data_rec/recon_{k:05}.tiff'))
-                except:
-                    pass
+            else:
+                rec_folder = Path.cwd().joinpath('data_rec', 'test_data_rec')
+                good_recons = [i for i in rec_folder.iterdir() if i.name.startswith('recon_')]
+                for i in good_recons:
+                    ssum += np.linalg.norm(tifffile.imread(i))
             self.assertAlmostEqual(ssum, cmd[1], places=0)
 
 
