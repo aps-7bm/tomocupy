@@ -51,18 +51,27 @@ class Tests(unittest.TestCase):
             st = os.system(cmd[0])
             self.assertEqual(st, 0)
             ssum = 0
-            hdf_recon_path = Path.cwd().joinpath('data_rec', 'test_data_rec.h5')
+            root_name = self.find_data_file_name(cmd[0])
+            hdf_recon_path = Path.cwd().joinpath('data_rec', f'{root_name}_rec.h5')
             if hdf_recon_path.is_file():
-                with h5py.File('data_rec/test_data_rec.h5', 'r') as fid:
+                with h5py.File(hdf_recon_path, 'r') as fid:
                     data = fid['exchange/data']
                     ssum = np.sum(np.linalg.norm(data[:], axis=(1, 2)))
             else:
-                rec_folder = Path.cwd().joinpath('data_rec', 'test_data_rec')
+                rec_folder = Path.cwd().joinpath('data_rec', f'{root_name}_rec')
                 good_recons = [i for i in rec_folder.iterdir() if i.name.startswith('recon_')]
                 for i in good_recons:
                     ssum += np.linalg.norm(tifffile.imread(i))
+            print(f'Summed norm = {ssum:8.3f}')
             self.assertAlmostEqual(ssum, cmd[1], places=0)
 
+    def find_data_file_name(self, cmd):
+        '''Returns the name (no extension) of the data file being reconstructed.
+        '''
+        split_1 = cmd.split('--file-name ')[1]
+        split_2 = split_1.split(' ')[0]
+        split_3 = split_2.split('/')[1]
+        return split_3.split('.')[0]
 
 if __name__ == '__main__':
     unittest.main(testLoader=SequentialTestLoader(), failfast=True)
