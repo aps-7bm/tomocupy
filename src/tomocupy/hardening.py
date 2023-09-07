@@ -293,7 +293,7 @@ class Beam_Corrector():
         Use to compute the effective pixel size.
         '''
         log.info('  *** auto pixel size reading')
-        if params.pixel_size_read != True:
+        if params.read_pixel_size != True:
             log.info('  *** *** OFF')
             return params
         
@@ -326,7 +326,7 @@ class Beam_Corrector():
     def read_scintillator(self, params):
         '''Read the scintillator type and thickness from the HDF file.
         '''
-        if params.scintillator_read:
+        if params.read_scintillator:
             log.info('  *** auto reading scintillator params')
             possible_names = ['/measurement/instrument/detection_system/scintillator/scintillating_thickness',
                             '/measurement/instrument/detection_system/scintillator/active_thickness']

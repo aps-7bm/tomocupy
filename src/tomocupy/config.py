@@ -324,11 +324,11 @@ SECTIONS['beam-hardening'] = {
         'default': 36.0,
         'type': float,
         'help': 'Distance from source to scintillator in m'},
-    'scintillator-read': {
+    'read-scintillator': {
         'default': False,
         'help': "When set, read scintillator properties from the HDF file",
         'action': 'store_true'},
-    'pixel-size-read': {
+    'read-pixel-size': {
         'default': False,
         'help': "When set, read effective pixel size from the HDF file",
         'action': 'store_true'},
@@ -349,7 +349,7 @@ SECTIONS['beam-hardening'] = {
         'type': str,
         'help': 'Sample material for beam hardening'},
     'sample-density': {
-        'default': 1.0,
+        'default': 0.0,
         'type': float,
         'help': 'Density of sample material in g/cm^3'},
     'filter-1-auto': {
@@ -364,7 +364,7 @@ SECTIONS['beam-hardening'] = {
         'type': float,
         'help': 'Filter 1 thickness in microns'},
     'filter-1-density': {
-        'default': 1.0,
+        'default': 0.0,
         'type': float,
         'help': 'Filter 1 density in g/cm^3'},
     'filter-2-auto': {
@@ -379,7 +379,7 @@ SECTIONS['beam-hardening'] = {
         'type': float,
         'help': 'Filter 2 thickness in microns'},
     'filter-2-density': {
-        'default': 1.0,
+        'default': 0.0,
         'type': float,
         'help': 'Filter 2 density in g/cm^3'},
     'filter-3-auto': {
@@ -394,14 +394,14 @@ SECTIONS['beam-hardening'] = {
         'type': float,
         'help': 'Filter 3 thickness in microns'},
     'filter-3-density': {
-        'default': 1.0,
+        'default': 0.0,
         'type': float,
         'help': 'Filter 3 density in g/cm^3'},
     'calculate-source': {
         'default': 'none',
         'type': str,
         'help': "Read source data from file ('none') or calculate ('standard')"},
-    'e_storage_ring': {
+    'e-storage-ring': {
         'default': 7.0,
         'type': float,
         'help': 'Storage ring energy in GeV'},
@@ -559,7 +559,7 @@ SECTIONS['reconstruction'] = {
 }
 
 
-RECON_PARAMS = ('file-reading', 'remove-stripe',
+RECON_PARAMS = ('file-reading', 'remove-stripe', 'retrieve-phase',
                 'reconstruction', 'fw', 'ti', 'vo-all', 'reconstruction-types', 'beam-hardening')
 RECON_STEPS_PARAMS = ('file-reading', 'remove-stripe', 'reconstruction',
                       'retrieve-phase', 'fw', 'ti', 'vo-all', 'lamino', 'reconstruction-steps-types', 'rotate-proj', 'beam-hardening')
