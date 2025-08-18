@@ -1,3 +1,4 @@
+from pathlib import Path
 import unittest
 import os
 import numpy as np
@@ -39,8 +40,14 @@ cmd_dict = {
     f'{prefix} --rotation-axis-auto auto --rotation-axis-method sift  --reconstruction-type full' : 28.305,
     f'{prefix} --rotation-axis-auto auto --rotation-axis-method vo --center-search-step 0.1 --nsino 0.5 --center-search-width 100 --reconstruction-type full' : 28.303,
     f'{prefix} --remove-stripe-method vo-all ': 27.993,
+    f'{prefix} --bright-ratio 10': 32.631,
+    f'{prefix} --end-column 1535': 28.293,
+    f'{prefix} --end-column 1535 --binning 3': 1.82,    
+    f'{prefix2} {prefix3} {prefix5} --beam-hardening-method standard --calculate-source standard': 3255.912,
+    f'{prefix2} {prefix3} {prefix4} --beam-hardening-method standard': 3248.832,
+    f'{prefix2} {prefix3} {prefix4} --beam-hardening-method standard --calculate-source standard': 3254.634,
+    f'{prefix2} {prefix3} {prefix4} --beam-hardening-method standard --calculate-source standard --e-storage-ring 3.0 --b-storage-ring 0.3': 822.178,    
 }
-
 
 class SequentialTestLoader(unittest.TestLoader):
     def getTestCaseNames(self, testCaseClass):
@@ -54,23 +61,34 @@ class Tests(unittest.TestCase):
 
     def test_full_recon(self):
         for cmd in cmd_dict.items():
+            if 'beam-hardening' in cmd[0]:
+                try:
+                    import beamhardening
+                except:
+                    print('Beamhardening is not installed, skip the test')
+                    continue
+
             shutil.rmtree('data_rec',ignore_errors=True)      
             print(f'TEST {inspect.stack()[0][3]}: {cmd[0]}')
             st = os.system(cmd[0])
             self.assertEqual(st, 0)
             ssum = 0
-            root_name = self.find_data_file_name(cmd[0])
-            hdf_recon_path = Path.cwd().joinpath('data_rec', f'{root_name}_rec.h5')
-            if hdf_recon_path.is_file():
-                with h5py.File(hdf_recon_path, 'r') as fid:
+            try:
+                file_name = cmd[0].split("--file-name ")[1].split('.')[0].split('/')[-1]
+                data_file = Path('data_rec').joinpath(file_name)
+                with h5py.File('data_rec/test_data_rec.h5', 'r') as fid:
                     data = fid['exchange/data']
+                    print(data.shape)
                     ssum = np.sum(np.linalg.norm(data[:], axis=(1, 2)))
-            else:
-                rec_folder = Path.cwd().joinpath('data_rec', f'{root_name}_rec')
-                good_recons = [i for i in rec_folder.iterdir() if i.name.startswith('recon_')]
-                for i in good_recons:
-                    ssum += np.linalg.norm(tifffile.imread(i))
-            print(f'Summed norm = {ssum:8.3f}')
+            except:
+                pass
+            for k in range(24):
+                file_name = cmd[0].split("--file-name ")[1].split('.')[0].split('/')[-1]
+                try:
+                    ssum += np.linalg.norm(tifffile.imread(
+                        f'data_rec/{file_name}_rec/recon_{k:05}.tiff'))
+                except:
+                    pass
             self.assertAlmostEqual(ssum, cmd[1], places=0)
 
     def find_data_file_name(self, cmd):
@@ -80,6 +98,7 @@ class Tests(unittest.TestCase):
         split_2 = split_1.split(' ')[0]
         split_3 = split_2.split('/')[1]
         return split_3.split('.')[0]
+
 
 if __name__ == '__main__':
     unittest.main(testLoader=SequentialTestLoader(), failfast=True)

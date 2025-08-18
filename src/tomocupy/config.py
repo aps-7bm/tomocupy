@@ -39,22 +39,24 @@
 # *************************************************************************** #
 
 import sys
-from copy import copy
-from pathlib import Path
 import argparse
 import configparser
-from collections import OrderedDict
-# import logging
+import logging
 import warnings
 import inspect
-
 import h5py
 import numpy as np
 
-from tomocupy import log_local as logging
+from copy import copy
+from pathlib import Path
+from collections import OrderedDict
+
 from tomocupy import utils
 from tomocupy import __version__
 
+__author__ = "Viktor Nikitin"
+__copyright__ = "Copyright (c) 2022, UChicago Argonne, LLC."
+__docformat__ = 'restructuredtext en'
 
 log = logging.getLogger(__name__)
 
@@ -160,7 +162,6 @@ SECTIONS['file-reading'] = {
         'help': "Angle range for blocked views [st,end]. Can be a list of ranges(e.g. [[0,1.2],[3,3.14]])"},
 }
 
-
 SECTIONS['remove-stripe'] = {
     'remove-stripe-method': {
         'default': 'none',
@@ -168,7 +169,6 @@ SECTIONS['remove-stripe'] = {
         'help': "Remove stripe method: none, fourier-wavelet, titarenko",
         'choices': ['none', 'fw', 'ti', 'vo-all']},
 }
-
 
 SECTIONS['fw'] = {
     'fw-sigma': {
@@ -190,7 +190,6 @@ SECTIONS['fw'] = {
         'action': 'store_true'},
 }
 
-
 SECTIONS['vo-all'] = {
     'vo-all-snr': {
         'default': 3,
@@ -209,7 +208,6 @@ SECTIONS['vo-all'] = {
         'help': "Dimension of the window."},
 }
 
-
 SECTIONS['ti'] = {
     'ti-beta': {
         'default': 0.022,  # as in the paper
@@ -226,7 +224,7 @@ SECTIONS['retrieve-phase'] = {
         'default': 'none',
         'type': str,
         'help': "Phase retrieval correction method",
-        'choices': ['none', 'paganin']},
+        'choices': ['none', 'paganin', 'Gpaganin']},
     'energy': {
         'default': 0,
         'type': float,
@@ -235,14 +233,18 @@ SECTIONS['retrieve-phase'] = {
         'default': 0,
         'type': float,
         'help': "Sample detector distance [mm]"},
-    'pixel-size': {
-        'default': 0,
-        'type': float,
-        'help': "Pixel size [microns]"},
     'retrieve-phase-alpha': {
         'default': 0,
         'type': float,
         'help': "Regularization parameter"},
+    'retrieve-phase-delta-beta': {
+        'default': 1500.0,
+        'type': float,
+        'help': "delta/beta material for Generalized Paganin"},
+    'retrieve-phase-W': {
+        'default': 2e-4,
+        'type': float,
+        'help': "Characteristic transverse length for Generalized Paganin"},
     'retrieve-phase-pad': {
         'type': utils.positive_int,
         'default': 1,
@@ -491,7 +493,7 @@ SECTIONS['reconstruction'] = {
         'type': str,
         'help': "Projection pairs to find rotation axis. Each second projection in a pair will be flipped and used to find shifts from the first element in a pair. The shifts are used to calculate the center.  Example [0,1499] for a 180 deg scan, or [0,1499,749,2249] for 360, etc.", },
     'rotation-axis-sift-threshold': {
-        'default': '0.5',
+        'default': 0.5,
         'type': float,
         'help': "SIFT threshold for rotation search.", },
     'rotation-axis-method': {
@@ -526,7 +528,7 @@ SECTIONS['reconstruction'] = {
         'default': 'parzen',
         'type': str,
         'help': "Filter for FBP reconstruction",
-        'choices': ['ramp', 'shepp', 'hann', 'hamming', 'parzen', 'cosine', 'cosine2']},
+        'choices': ['none', 'ramp', 'shepp', 'hann', 'hamming', 'parzen', 'cosine', 'cosine2']},
     'dezinger': {
         'type': int,
         'default': 0,
@@ -549,18 +551,134 @@ SECTIONS['reconstruction'] = {
     'flat-linear': {
         'default': 'False',
         'help': "Interpolate flat fields for each projections, assumes the number of flat fields at the beginning of the scan is as the same as a the end."},
-    'pad-endpoint': {
-        'default': 'False',
-        'help': "Include or not endpoint for smooting in double fov reconstruction (preventing circle in the middle)."},
-    'bright_exp_ratio': {
-        'default': '1',
+    'bright-ratio': {
         'type': float,
-        'help': "Bright aspect ration between exposure for flat fields and projections."},
+        'default': 1,
+        'help': 'exposure time for flat fields divided by the exposure time of projections'},
+    'pixel-size': {
+        'default': 0,
+        'type': float,
+        'help': "Pixel size [microns]"},
+}
+
+SECTIONS['beam-hardening'] = {
+    'beam-hardening-method': {
+        'default': 'none',
+        'type': str,
+        'help': "Beam hardening method.",
+        'choices': ['none', 'standard']},
+    'source-distance': {
+        'default': 36.0,
+        'type': float,
+        'help': 'Distance from source to scintillator in m'},
+    'read-scintillator': {
+        'default': False,
+        'help': "When set, read scintillator properties from the HDF file",
+        'action': 'store_true'},
+    'read-pixel-size': {
+        'default': False,
+        'help': "When set, read effective pixel size from the HDF file",
+        'action': 'store_true'},
+    'scintillator-material': {
+        'default': 'LuAG_Ce',
+        'type': str,
+        'help': 'Scintillator material for beam hardening'},
+    'scintillator-thickness': {
+        'default': 100.0,
+        'type': float,
+        'help': 'Scintillator thickness in microns'},
+    'scintillator-density': {
+        'default': 6.0,
+        'type': float,
+        'help': 'Density of scintillator in g/cm^3'},
+    'sample-material': {
+        'default': 'Fe',
+        'type': str,
+        'help': 'Sample material for beam hardening'},
+    'sample-density': {
+        'default': 1.0,
+        'type': float,
+        'help': 'Density of sample material in g/cm^3'},
+    'filter-1-auto': {
+        'default': False,
+        'help': 'If True, read filter 1 from HDF meta data'},
+    'filter-1-material': {
+        'default': 'none',
+        'type': str,
+        'help': 'Filter 1 material for beam hardening'},
+    'filter-1-thickness': {
+        'default': 0.0,
+        'type': float,
+        'help': 'Filter 1 thickness in microns'},
+    'filter-1-density': {
+        'default': 1.0,
+        'type': float,
+        'help': 'Filter 1 density in g/cm^3'},
+    'filter-2-auto': {
+        'default': False,
+        'help': 'If True, read filter 2 from HDF meta data'},
+    'filter-2-material': {
+        'default': 'none',
+        'type': str,
+        'help': 'Filter 2 material for beam hardening'},
+    'filter-2-thickness': {
+        'default': 0.0,
+        'type': float,
+        'help': 'Filter 2 thickness in microns'},
+    'filter-2-density': {
+        'default': 1.0,
+        'type': float,
+        'help': 'Filter 2 density in g/cm^3'},
+    'filter-3-auto': {
+        'default': False,
+        'help': 'If True, read filter 3 from HDF meta data'},
+    'filter-3-material': {
+        'default': 'none',
+        'type': str,
+        'help': 'Filter 3 material in microns'},
+    'filter-3-thickness': {
+        'default': 0.0,
+        'type': float,
+        'help': 'Filter 3 thickness for beam hardening'},
+    'filter-3-density': {
+        'default': 1.0,
+        'type': float,
+        'help': 'Filter 3 density in g/cm^3'},
+    'calculate-source': {
+        'default': 'none',
+        'type': str,
+        'help': "Use tabulated (none, default) or calculated source",
+        'choices': ['none', 'standard']},
+    'e-storage-ring': {
+        'default': 7.0,
+        'type': float,
+        'help': "e-beam energy for BM source in GeV"},
+    'b-storage-ring': {
+        'default': 0.599,
+        'type': float,
+        'help': "Magnetic field for BM source in T"},
+    'minimum-E': {
+        'default': 1000,
+        'type': float,
+        'help': "Minimum energy to model in eV"},
+    'maximum-E': {
+        'default': 200000,
+        'type': float,
+        'help': "Maximum energy to model in eV"},
+    'step-E': {
+        'default': 500,
+        'type': float,
+        'help': "Energy step in eV"},
+    'maximum-psi-urad': {
+        'default': 40,
+        'type': float,
+        'help': "Maximum vertical angle from centerline to model in microradians"},
+
 }
 
 
-RECON_PARAMS = ('file-reading', 'remove-stripe', 'retrieve-phase',
-                'reconstruction', 'fw', 'ti', 'vo-all', 'reconstruction-types', 'beam-hardening')
+RECON_PARAMS = ('file-reading', 'remove-stripe',
+                'reconstruction', 'fw', 'ti', 'vo-all', 'lamino', 'reconstruction-types', 'beam-hardening')
 RECON_STEPS_PARAMS = ('file-reading', 'remove-stripe', 'reconstruction',
                       'retrieve-phase', 'fw', 'ti', 'vo-all', 'lamino', 'reconstruction-steps-types', 'rotate-proj', 'beam-hardening')
 
