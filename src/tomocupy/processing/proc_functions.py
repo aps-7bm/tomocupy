@@ -38,65 +38,12 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                #
 # *************************************************************************** #
 
-<<<<<<< HEAD:src/tomocupy/tomo_functions.py
-from tomocupy import fourierrec
-from tomocupy import lprec
-from tomocupy import fbp_filter
-from tomocupy import linerec
-from tomocupy import utils
-from tomocupy import retrieve_phase, remove_stripe, adjust_projections
-from tomocupy import utils
-=======
 from tomocupy.processing import retrieve_phase, remove_stripe
->>>>>>> upstream/main:src/tomocupy/processing/proc_functions.py
 import cupyx.scipy.ndimage as ndimage
 from tomocupy.global_vars import args, params
 import cupy as cp
 
 
-<<<<<<< HEAD:src/tomocupy/tomo_functions.py
-class TomoFunctions():
-    def __init__(self, cl_conf, cl_filepars):
-
-        self.args = cl_conf.args
-        self.ni = cl_conf.ni
-        self.n = cl_conf.n
-        self.nz = cl_conf.nz
-        self.ncz = cl_conf.ncz
-        self.nproj = cl_conf.nproj
-        self.ncproj = cl_conf.ncproj
-        self.centeri = cl_conf.centeri
-        self.center = cl_conf.center
-        self.bh_obj = cl_filepars.bh_obj
-        self.bright_exp_ratio = cl_filepars.bright_exp_ratio
-        
-        self.ne = 4*self.n
-        if self.args.dtype == 'float16':
-            # power of 2 for float16
-            self.ne = 2**int(np.ceil(np.log2(self.ne)))
-
-        if self.args.lamino_angle == 0:
-            if self.args.reconstruction_algorithm == 'fourierrec':
-                self.cl_rec = fourierrec.FourierRec(
-                    self.n, self.nproj, self.ncz, cp.array(cl_conf.theta), self.args.dtype)
-            elif self.args.reconstruction_algorithm == 'lprec':
-                self.centeri += 0.5      # consistence with the Fourier based method
-                self.center += 0.5
-                self.cl_rec = lprec.LpRec(
-                    self.n, self.nproj, self.ncz, cp.array(cl_conf.theta), self.args.dtype)
-            elif self.args.reconstruction_algorithm == 'linerec':
-                self.cl_rec = linerec.LineRec(
-                    cp.array(cl_conf.theta), self.nproj, self.nproj, self.ncz, self.ncz, self.n, self.args.dtype)
-            self.cl_filter = fbp_filter.FBPFilter(
-                self.ne, self.nproj, self.ncz, self.args.dtype)
-        else:
-            self.cl_rec = linerec.LineRec(
-                cp.array(cl_conf.theta), self.nproj, self.ncproj, self.nz, self.ncz, self.n, self.args.dtype)
-            self.cl_filter = fbp_filter.FBPFilter(
-                self.ne, self.ncproj, self.nz, self.args.dtype)  # note ncproj,nz!
-        self.wfilter = self.cl_filter.calc_filter(self.args.fbp_filter)
-        
-=======
 class ProcFunctions():
     def __init__(self):
 
@@ -104,7 +51,6 @@ class ProcFunctions():
         if args.beam_hardening_method != 'none':
             from tomocupy.processing.external import hardening
             self.cl_hardening = hardening.Beam_Corrector(args)
->>>>>>> upstream/main:src/tomocupy/processing/proc_functions.py
 
     def darkflat_correction(self, data, dark, flat):
         """Dark-flat field correction"""
@@ -121,16 +67,10 @@ class ProcFunctions():
         else:
             flat0 = cp.mean(flat0, axis=0)
         dark0 = cp.mean(dark0, axis=0)
-<<<<<<< HEAD:src/tomocupy/tomo_functions.py
-        res = (data.astype(self.args.dtype, copy=False)-dark0) / (flat0-dark0+1e-3)
-        res[res <= 0] = 1
-        # Account for data with a different bright correction
-        res *= self.bright_exp_ratio 
-=======
         res = (data.astype(args.dtype, copy=False)-dark0) / \
             (flat0-dark0+flat0*1e-5)
-
->>>>>>> upstream/main:src/tomocupy/processing/proc_functions.py
+        # Account for data with a different bright correction
+        res *= self.bright_exp_ratio 
         return res
 
     def minus_log(self, data):
@@ -142,14 +82,6 @@ class ProcFunctions():
         data[cp.isinf(data)] = 0
         return data  # reuse input memory
 
-<<<<<<< HEAD:src/tomocupy/tomo_functions.py
-    def beamhardening(self, data, current_rows):
-        """Beam hardening correction"""
-        
-        data[:] = self.bh_obj.correct_centerline(data)
-        data[:] = self.bh_obj.correct_angle(data, current_rows)
-        return data # reuse input memory
-=======
     def beamhardening(self, data, start_row, end_row):
         """Beam hardening correction"""
         if start_row == None:
@@ -160,7 +92,6 @@ class ProcFunctions():
         data[:] = self.cl_hardening.correct_centerline(data)
         data[:] = self.cl_hardening.correct_angle(data, current_rows)
         return data
->>>>>>> upstream/main:src/tomocupy/processing/proc_functions.py
 
     def remove_outliers(self, data):
         """Remove outliers"""
@@ -229,11 +160,7 @@ class ProcFunctions():
 
         return res
 
-<<<<<<< HEAD:src/tomocupy/tomo_functions.py
-    def proc_proj(self, data, st, end, res=None):
-=======
     def proc_proj(self, data, st=None, end=None, res=None):
->>>>>>> upstream/main:src/tomocupy/processing/proc_functions.py
         """Processing a projection data chunk"""
 
         if not isinstance(res, cp.ndarray):
@@ -251,14 +178,9 @@ class ProcFunctions():
         # minus log
         if args.minus_log == 'True':
             data[:] = self.minus_log(data)
-<<<<<<< HEAD:src/tomocupy/tomo_functions.py
-        if self.args.beam_hardening_method != 'none':
-            data[:] = self.beamhardening(data, cp.arange(st, end))
-=======
         # beam hardening correction
         if args.beam_hardening_method != 'none':
             data[:] = self.beamhardening(data, st, end)
->>>>>>> upstream/main:src/tomocupy/processing/proc_functions.py
         # padding for 360 deg recon
         if args.file_type == 'double_fov':
             res[:] = self.pad360(data)
