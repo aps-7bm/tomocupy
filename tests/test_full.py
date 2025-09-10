@@ -6,7 +6,6 @@ import tifffile
 import inspect
 import h5py
 import shutil
-from pathlib import Path
 
 prefix = 'tomocupy recon --file-name data/test_data.h5 --reconstruction-type full --rotation-axis 782.5 --nsino-per-chunk 4'
 prefix2 = 'tomocupy recon --file-name data/Downsampled_WB.h5 --reconstruction-type full --nsino-per-chunk 4 --rotation-axis 808 --sample-material Pb '
@@ -90,14 +89,6 @@ class Tests(unittest.TestCase):
                 except:
                     pass
             self.assertAlmostEqual(ssum, cmd[1], places=0)
-
-    def find_data_file_name(self, cmd):
-        '''Returns the name (no extension) of the data file being reconstructed.
-        '''
-        split_1 = cmd.split('--file-name ')[1]
-        split_2 = split_1.split(' ')[0]
-        split_3 = split_2.split('/')[1]
-        return split_3.split('.')[0]
 
 
 if __name__ == '__main__':
