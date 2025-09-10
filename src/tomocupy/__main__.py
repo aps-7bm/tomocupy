@@ -46,7 +46,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-from tomocupy import log_local as logging
+from tomocupy import logging
 from tomocupy import config
 from tomocupy import GPURec
 from tomocupy import FindCenter
